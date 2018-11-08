@@ -7,7 +7,9 @@
 using namespace std;
 
 double PIT_PROBABILITY = .2;
-
+int consec_turns = 0;
+bool go_home = false;
+ int try_ = 0;
 Agent::Agent ()
 {
 	for (int i = 1; i <= 4; i++) {
@@ -45,8 +47,9 @@ void Agent::Initialize ()
 			searchEngine.RemoveSafeLocation(x, y);
 		}
 		
+		
 		cout << "CURRENT COUNTER" << currentCounter <<endl;
-
+		
 		currentCounter =0;
 	}
 
@@ -93,18 +96,23 @@ Action Agent::Process (Percept& percept)
 
 	if(actionList.empty()){
 
+		
+
 		if(!currentState.agentHasGold && !(currentState.goldLocation == Location(0,0))) {			
 			// grab the gold if known
 			cout << "Gold AT (" << currentState.goldLocation.X << "," << currentState.goldLocation.Y << ")" << endl;
 			actionList2 = searchEngine.FindPath(currentState.agentLocation, currentState.agentOrientation, currentState.goldLocation, RIGHT);
 			actionList.splice(actionList.end(), actionList2);
 		}
-		else if(currentState.agentHasGold && !(currentState.agentLocation == Location(1,1))) {
+		else if(go_home == true && currentState.agentLocation == Location(1,1)){
+			actionList.push_back(CLIMB);
+		}
+		else if((currentState.agentHasGold && !(currentState.agentLocation == Location(1,1)))|| go_home ==true) {
 			// =(1,1) and climb
-			cout << "I have achieved the gold, I am going  to (1,1)" << endl;
+			cout << "I am going  to (1,1)" << endl;
 			actionList2 = searchEngine.FindPath(currentState.agentLocation, currentState.agentOrientation, Location(1,1), LEFT);
 			actionList.splice(actionList.end(), actionList2);
-		} else if (currentState.agentHasGold && (currentState.agentLocation == Location(1,1))) { // Rule 4b
+		} else if ((currentState.agentHasGold && (currentState.agentLocation == Location(1,1)))) { // Rule 4b
 			actionList.push_back(CLIMB);
 		} else if (percept.Stench && currentState.agentHasArrow) { // shoot
 			actionList.push_back(SHOOT);
@@ -125,10 +133,22 @@ Action Agent::Process (Percept& percept)
 	}
 	    action = actionList.front();
 		actionList.pop_front();
-		if((action == GOFORWARD) && ProbabilityOverThreshold()){
+		if((action == GOFORWARD) && ProbabilityOverThreshold() && !go_home && !agentHasGold ){
 			action = TURNLEFT;
 			actionList.empty();
 		}
+		
+		if(action == TURNLEFT  || action == TURNRIGHT){
+			consec_turns++;
+		}
+		else{
+			consec_turns =0;
+		}
+		if(consec_turns >= 4 ){
+			cout << " GOING HOME";
+			go_home = true;
+		}
+		cout << "CONSEC TURNS" << consec_turns <<"\n";
 		lastAction = action;
 		lastPercept = percept;
 		currentCounter++;
@@ -262,8 +282,10 @@ double Agent::CalculateProbability(Location location)
 {
 	vector<Location> relativeFrontier = GenerateFrontier(location);
 
-	if(relativeFrontier.size() == 0)
+	if(relativeFrontier.size() == 0){
 		return 0;
+	}
+
 	
 	double alpha;
 
@@ -326,15 +348,17 @@ double Agent::CalculateProbabilityFalse(Location location, vector<Location> rela
 	//if there's only one relative frontier location, only one combination possible where destination isn't pit
 	if(relativeFrontier.size()==1)
 	{
-		return (1 - PIT_PROBABILITY);
+        cout <<"PROB: ";
+        cout << PIT_PROBABILITY << endl;
+		return (PIT_PROBABILITY);
 	}
 
 	if(relativeFrontier.size()==2)
 	{
 		//three possible combinations if the two relative frontier locations
-		if(SameBreezeAdjancent(relativeFrontier[0], relativeFrontier[1]))
+		if(SameBreezeAdjacent(relativeFrontier[0], relativeFrontier[1]))
 		{
-			prob = ((1-PIT_PROBABILITY )* PIT_PROBABILITY);
+			prob = (PIT_PROBABILITY * PIT_PROBABILITY);
 		}
 
 		else
@@ -352,8 +376,11 @@ double Agent::CalculateProbabilityFalse(Location location, vector<Location> rela
 		prob += PIT_PROBABILITY * (1-PIT_PROBABILITY) * PIT_PROBABILITY;
 		prob += (1-PIT_PROBABILITY) * PIT_PROBABILITY * PIT_PROBABILITY;
 	}
+    
+    cout <<"PROB: ";
+    cout << prob << endl;
 
-	return .8 *prob;
+	return prob;
 
 }
 
@@ -393,10 +420,15 @@ bool Agent::ProbabilityOverThreshold()
 		y--;
 	}
 
-	if(y<1 || x < 1 || y>=4 ||x >= 4){
+	if(y<1 || x < 1 || y>4 ||x > 4){
+		cout << "R E TURNING TRUEEEE" << "\n";
 		return true;
 	}
 	query = Location(x,y);
+
+	if(query.X == 1 && query.Y == 1){
+		return false;
+	}
 
 	prob = CalculateProbability(Location(x,y));
 
@@ -409,15 +441,18 @@ bool Agent::ProbabilityOverThreshold()
 
 }
 
-bool Agent::SameBreezeAdjancent(Location location1, Location location2){
+bool Agent::SameBreezeAdjacent(Location location1, Location location2)
+{
 	vector<Location>::iterator itr;
-	for (itr = breeze.begin(); itr != breeze.end(); itr++) 
+
+	for (itr = adjBreeze.begin(); itr != adjBreeze.end(); itr++) 
 	{
-		if((*itr  == Location(location1.X+1,location1.Y) || *itr  == Location(location1.X,location1.Y+1)) && (*itr  == Location(location1.X,location1.Y+1) ||  *itr  == Location(location1.X,location1.Y-1)))
+		if(Adjacent(*itr, location1) && Adjacent(*itr, location2))
 		{
 			return true;
 		}
 
 	}
 	return false;
+
 }

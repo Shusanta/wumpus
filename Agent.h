@@ -47,6 +47,7 @@ public:
 	bool isBreeze(int x, int y);
 	bool ProbabilityOverThreshold();
 	bool SameBreezeAdjancent(Location location1, Location location2);
+	bool SameBreezeAdjacent(Location location1, Location location2);
 	
 };
 
